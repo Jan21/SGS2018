@@ -89,6 +89,9 @@ def simplify_array_of_commands(arr):
 pure_arr_of_diags = simplify_array(arr_of_diags)
 pure_arr_of_mats = simplify_array(arr_of_mats)
 pure_arr_of_commands = simplify_array_of_commands(commands)
+
+for d in pure_arr_of_diags:
+    print('max_diag',torch.max(d))
 # compute the Moore-Penrose inverse
 def get_unbinders_from_mat(mat):
     mat_np = mat.numpy()
@@ -109,73 +112,38 @@ inverse_of_roles = get_unbinders_from_mat(mat_from_roles)
 
 tensor_subcommands = torch.stack(pure_arr_of_mats,2)
 
-memory_tensor = torch.matmul(tensor_subcommands, mat_from_diags)
+memory_tensor = torch.matmul(tensor_subcommands,mat_from_diags)
 
-
-restored_subcomands = torch.matmul(memory_tensor,inverse_of_diags).permute(2,0,1)
-un_role = torch.matmul(restored_subcomands,inverse_of_roles)
-
-
-
-np_R_inv = inverse_of_roles.numpy()
-np_A_inv = inverse_of_diags.numpy()
-np_A = mat_from_diags.numpy()
-np_R = mat_from_roles.numpy()
-np_A_inv_rolled =  np.roll(np_A_inv,np_A_inv.shape[1]-1,1)
-np_R_inv_rolled =  np.roll(np_R_inv,np_R_inv.shape[1]-1,1)
-rolled_A_inv = torch.from_numpy(np_A_inv_rolled)
-rolled_R_inv = torch.from_numpy(np_R_inv_rolled)
-A_circular = torch.matmul(rolled_A_inv,mat_from_diags)
-R_circular = torch.matmul(rolled_R_inv,mat_from_roles)
+restored_subcomands = torch.matmul(memory_tensor, inverse_of_diags)
 
 all_used_symbols = {**dict_of_atom_vectors,**dict_of_pointers}
 
-# att_vec = inverse_of_diags[:,0]
-# for a in range(5):
-#     print((att_vec - inverse_of_diags[:,a]).sum())
-#     att_vec = torch.mv(A_circular, att_vec)
+
+C = tensor_subcommands - restored_subcomands
+print(C)
+
+# test wether the matrices are good
+# for i,c in enumerate(pure_arr_of_commands):
+#     mat = pure_arr_of_mats[i]
 #
-# role_vec = inverse_of_roles[:,0]
-# for r in range(3):
-#     print((role_vec - inverse_of_roles[:,r]).sum())
-#     role_vec = torch.mv(R_circular, role_vec)
-
-#create array of arrays with vectors for the symbols
-arr_af_arrs_of_commands = []
-for com in pure_arr_of_commands:
-    arr_for_command = []
-    for sym in com:
-        arr_for_command.append(all_used_symbols[sym])
-    arr_af_arrs_of_commands.append(arr_for_command)
-
-
-# test whether the unbinding works
-# for a in range(5):
-#     for r in range(3):
-#         print(pure_arr_of_commands[a][r])
-#         orig = arr_af_arrs_of_commands[a][r]
-#         reconstructed = un_role[a,:,r]
-#         diff = orig - reconstructed
-#         diff2 = arr_af_arrs_of_commands[a][2] - reconstructed
-#         diff3 = arr_af_arrs_of_commands[3][r] - reconstructed
-#         print((diff).sum())
-
-def unbind_role_att(role_vec,att_vec,r,att):
-    a = torch.addr(torch.zeros(dim,dim),role_vec,att_vec)
-    un_att = torch.mul(memory_tensor,a)
-    fil = torch.sum(torch.sum(un_att,2),1)
-    orig = arr_af_arrs_of_commands[att][r]
-    diff = orig-fil
-    print(pure_arr_of_commands[att][r])
-    print((diff).sum())
+#     mat_for_command = torch.zeros(dim,dim)
+#     for i,t in enumerate(c):
+#         vec_for_command = all_used_symbols[t]
+#         vec_for_role = dict_of_role_vectors[arr_of_roles[i]]
+#         mat_for_command += torch.addr(torch.zeros(dim,dim),vec_for_command,vec_for_role)
+#
+#     difference = mat - mat_for_command
+#     print(c)
+#     print("diffenrece",difference.sum())
 
 
 
-role_vec, att_vec = inverse_of_roles[:,0], inverse_of_diags[:,0]
-for a in range(5):
-    for r in range(3):
-        unbind_role_att(role_vec,att_vec,r,a)
-        role_vec = torch.mv(R_circular,role_vec)
-    att_vec = torch.mv(A_circular,att_vec)
 
+for i,c in enumerate(pure_arr_of_commands):
+    mat = pure_arr_of_mats[i].numpy()
 
+    mat_for_command = restored_subcomands[:,:,i].numpy()
+    print(c)
+    output = np.subtract(mat_for_command,mat)
+    print(output.sum())
+#un_role = torch.matmul(restored_subcomands,inverse_of_roles)
